@@ -71,7 +71,7 @@ void aesora_PMT9123::begin() {
 bool aesora_PMT9123::checkID() {
   // Select register
   Wire.beginTransmission(PMT9123_ADDRESS);
-  i2cwrite((uint8_t)PMT9123_REGISTER_PRODUCT_ID);
+  i2cwrite((uint8_t)PMT9123_REGISTER_R_PRODUCT_ID);
   wire.endTransmission();
 
   // Read product id and compare
@@ -87,7 +87,7 @@ bool aesora_PMT9123::checkID() {
 uint8_t aesora_PMT9123::getResolution() {
   // Select register
   Wire.beginTransmission(PMT9123_ADDRESS);
-  i2cwrite((uint8_t)PMT9123_REGISTER_RESOLUTION_STEP);
+  i2cwrite((uint8_t)PMT9123_REGISTER_R_RESOLUTION_STEP);
   wire.endTransmission();
 
   // Read resolution
@@ -104,7 +104,7 @@ uint8_t aesora_PMT9123::getResolution() {
 void aesora_PMT9123::setResolution(uint8_t value) {
   // Select register
   Wire.beginTransmission(PMT9123_ADDRESS);
-  i2cwrite((uint8_t)PMT9123_REGISTER_RESOLUTION_STEP);
+  i2cwrite((uint8_t)PMT9123_REGISTER_W_RESOLUTION_STEP);
   i2cwrite(value);
   wire.endTransmission();
 
@@ -117,23 +117,24 @@ void aesora_PMT9123::setResolution(uint8_t value) {
     @brief  Gets the delta in x and y
 */
 /**************************************************************************/
-void aesora_PMT9123::getDelta(uint16_t *x, uint16_t *y) {
+void aesora_PMT9123::getDelta(int16_t *x, int16_t *y, uint8_t *mot) {
   uint8_t _x, _y, temp;
 
   // Select register
   Wire.beginTransmission(PMT9123_ADDRESS);
-  i2cwrite((uint8_t)PMT9123_REGISTER_DELTA_X_LSB);
+  i2cwrite((uint8_t)PMT9123_REGISTER_R_MOTION);
   wire.endTransmission();
 
   // Read delta
-  Wire.requestFrom(PMT9123_ADDRESS, 3);
+  Wire.requestFrom(PMT9123_ADDRESS, 4);
+  mot = i2cread();
   _x = i2cread();
   _y = i2cread();
   temp = i2cread();
 
   // Calculate
-  x = _x | ((uint16_t)(temp & 0xF0) << 4)	// might also be the other way around
-  y = _y | ((uint16_t)(temp & 0x0F) << 8)
+  x = _x | ((uint16_t)(temp & 0xF0) << 4) | (temp & 0x80) > 0 ? 0xF000 : 0;
+  y = _y | ((uint16_t)(temp & 0x0F) << 8) | (temp & 0x08) > 0 ? 0xF000 : 0;
 }
 
 /**************************************************************************/
@@ -141,10 +142,11 @@ void aesora_PMT9123::getDelta(uint16_t *x, uint16_t *y) {
     @brief Gets delta in x
 */
 /**************************************************************************/
-uint16_t aesora_PMT9123::getDeltaX(void) {
-  uint16_t x, y;
+int16_t aesora_PMT9123::getDeltaX(void) {
+  int16_t x, y;
+  uint8_t mot;
 
-  getDelta(&x, &y);
+  getDelta(&x, &y, &mot);
   return x;
 }
 
@@ -153,9 +155,93 @@ uint16_t aesora_PMT9123::getDeltaX(void) {
     @brief Gets delta in y
 */
 /**************************************************************************/
-uint16_t aesora_PMT9123::getDeltaY(void) {
-  uint16_t x, y;
+int16_t aesora_PMT9123::getDeltaY(void) {
+  int16_t x, y;
+  uint8_t mot;
 
-  getDelta(&x, &y);
+  getDelta(&x, &y, &mot);
   return y;
+}
+
+/**************************************************************************/
+/*!
+    @brief Gets surface quality
+*/
+/**************************************************************************/
+uint8_t aesora_PMT9123::getSQual(void) {
+  // Select register
+  Wire.beginTransmission(PMT9123_ADDRESS);
+  i2cwrite((uint8_t)PMT9123_REGISTER_R_SQUAL);
+  wire.endTransmission();
+
+  // Read squal
+  Wire.requestFrom(PMT9123_ADDRESS, 1);
+  return i2cread();
+}
+
+/**************************************************************************/
+/*!
+    @brief Gets shutter time in clock cycles
+*/
+/**************************************************************************/
+uint16_t aesora_PMT9123::getShutter(void) {
+  uint16_t ret = 0;
+  // Select register
+  Wire.beginTransmission(PMT9123_ADDRESS);
+  i2cwrite((uint8_t)PMT9123_REGISTER_R_SHUTTER_MSB);
+  wire.endTransmission();
+
+  // Read shutter
+  Wire.requestFrom(PMT9123_ADDRESS, 2);
+  ret = i2cread();
+  ret = ret << 8 | i2cread();
+  return ret;
+}
+
+/**************************************************************************/
+/*!
+    @brief Gets maximum pixel value in frame
+*/
+/**************************************************************************/
+uint8_t aesora_PMT9123::getPixelMax(void) {
+  // Select register
+  Wire.beginTransmission(PMT9123_ADDRESS);
+  i2cwrite((uint8_t)PMT9123_REGISTER_R_PIXEL_MAX);
+  wire.endTransmission();
+
+  // Read max pixel
+  Wire.requestFrom(PMT9123_ADDRESS, 1);
+  return i2cread();
+}
+
+/**************************************************************************/
+/*!
+    @brief Gets average pixel value in frame
+*/
+/**************************************************************************/
+uint8_t aesora_PMT9123::getPixelAvg(void) {
+  // Select register
+  Wire.beginTransmission(PMT9123_ADDRESS);
+  i2cwrite((uint8_t)PMT9123_REGISTER_R_PIXEL_AVG);
+  wire.endTransmission();
+
+  // Read avg pixel
+  Wire.requestFrom(PMT9123_ADDRESS, 1);
+  return i2cread();
+}
+
+/**************************************************************************/
+/*!
+    @brief Gets minimum pixel value in frame
+*/
+/**************************************************************************/
+uint8_t aesora_PMT9123::getPixelMin(void) {
+  // Select register
+  Wire.beginTransmission(PMT9123_ADDRESS);
+  i2cwrite((uint8_t)PMT9123_REGISTER_R_PIXEL_MIN);
+  wire.endTransmission();
+
+  // Read min pixel
+  Wire.requestFrom(PMT9123_ADDRESS, 1);
+  return i2cread();
 }
